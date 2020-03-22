@@ -29,7 +29,7 @@ public class RpcConsumer {
     private static UserClientHandler userClientHandler;
 
     //1.创建一个代理对象 providerName：UserService#sayHello are you ok?
-    public Object createProxy(final Class<?> serviceClass,final String providerName){
+    public Object createProxy(final Class<?> serviceClass){
         //借助JDK动态代理生成代理对象
         return  Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(), new Class<?>[]{serviceClass}, new InvocationHandler() {
             public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
