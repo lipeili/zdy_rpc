@@ -1,5 +1,6 @@
 package com.lagou.client;
 
+import com.lagou.subscriber.ServerProxyEntity;
 import com.lagou.util.RpcRequest;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -11,7 +12,7 @@ public class UserClientHandler extends ChannelInboundHandlerAdapter implements C
     private ChannelHandlerContext context;
     private String result;
     private RpcRequest para;
-
+    private ServerProxyEntity serverProxyEntity;
 
     public void channelActive(ChannelHandlerContext ctx) {
         context = ctx;
@@ -43,6 +44,11 @@ public class UserClientHandler extends ChannelInboundHandlerAdapter implements C
         this.para = para;
     }
 
+    public ServerProxyEntity getServerProxyEntity() {
+        return serverProxyEntity;
+    }
 
-
+    public void setServerProxyEntity(ServerProxyEntity serverProxyEntity) {
+        this.serverProxyEntity = serverProxyEntity;
+    }
 }

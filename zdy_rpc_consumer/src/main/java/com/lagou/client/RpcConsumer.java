@@ -1,7 +1,9 @@
 package com.lagou.client;
 
+import com.alibaba.fastjson.JSON;
+import com.lagou.subscriber.ServerProxyEntity;
+import com.lagou.subscriber.Subscriber;
 import com.lagou.util.JSONSerializer;
-import com.lagou.util.RpcDecoder;
 import com.lagou.util.RpcEncoder;
 import com.lagou.util.RpcRequest;
 import io.netty.bootstrap.Bootstrap;
@@ -13,11 +15,11 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringDecoder;
-import io.netty.handler.codec.string.StringEncoder;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -33,11 +35,13 @@ public class RpcConsumer {
         //借助JDK动态代理生成代理对象
         return  Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(), new Class<?>[]{serviceClass}, new InvocationHandler() {
             public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+
+                long startMills = System.currentTimeMillis();
                 //（1）调用初始化netty客户端的方法
 
-                if(userClientHandler == null){
+//                if(userClientHandler == null){
                  initClient();
-                }
+//                }
 
                 // 设置参数
                 RpcRequest request = new RpcRequest();
@@ -46,18 +50,16 @@ public class RpcConsumer {
                 request.setParameterTypes(new Class[]{String.class});
                 request.setParameters(new String[]{"are you ok?"});
                 userClientHandler.setPara(request);
-//                userClientHandler.setPara(providerName+args[0]);
+                Object response = executor.submit(userClientHandler).get();
 
-                // 去服务端请求数据
+                long endMills = System.currentTimeMillis();
+                System.out.println(JSON.toJSONString(userClientHandler.getServerProxyEntity()));
 
-                return executor.submit(userClientHandler).get();
+                userClientHandler.getServerProxyEntity().setLastInvokeCostMills(endMills - startMills);
+                return response;
             }
         });
-
-
     }
-
-
 
     //2.初始化netty客户端
     public static  void initClient() throws InterruptedException {
@@ -80,9 +82,36 @@ public class RpcConsumer {
                     }
                 });
 
-        bootstrap.connect("127.0.0.1",8990).sync();
+        Map<String, ServerProxyEntity> serverMap = Subscriber.serverMap;
 
+        ServerProxyEntity selectIpPort = null;
+        for (Map.Entry<String,ServerProxyEntity> entry : serverMap.entrySet()) {
+            ServerProxyEntity serverProxyEntity = entry.getValue();
+            
+            if (null == selectIpPort) {
+                selectIpPort = serverProxyEntity;
+            }
+            
+            if (null == serverProxyEntity.getLastInvokeMills()) {
+                selectIpPort = serverProxyEntity;
+                break;
+            }
+
+            if (System.currentTimeMillis() - serverProxyEntity.getLastInvokeMills() > 5000) {
+                selectIpPort = serverProxyEntity;
+                break;
+            }
+
+            if(selectIpPort.getLastInvokeCostMills() > serverProxyEntity.getLastInvokeCostMills()){
+                selectIpPort = serverProxyEntity;
+            }
+        }
+
+        selectIpPort.setLastInvokeMills(System.currentTimeMillis());
+        userClientHandler.setServerProxyEntity(selectIpPort);
+
+        bootstrap.connect(selectIpPort.getIpAddress(),selectIpPort.getPort()).sync();
+//        userClientHandler
     }
-
 
 }
